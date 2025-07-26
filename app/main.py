@@ -70,6 +70,13 @@ async def delete_file(filename: str = Form(...)):
         os.remove(file_path)
     return RedirectResponse(url="/", status_code=303)
 
+@app.get("/files/{filename}")
+async def get_file(filename: str):
+    file_path = os.path.join("/app/tmp", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    return {"error": "File not found"}
+
 
 @app.post("/convert")
 async def convert_xlsx(file: UploadFile = File(...)):

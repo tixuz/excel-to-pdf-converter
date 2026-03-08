@@ -21,6 +21,12 @@ wheels/
 *.egg
 MANIFEST
 
+# Additional Python patterns
+*.pyo
+*.pyd
+pip-log.txt
+pip-delete-this-directory.txt
+
 # Virtual Environments
 venv/
 .venv/
@@ -29,6 +35,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Environment files
+.env
+.env.*
+!.env.example
+
 # IDE
 .idea/
 .vscode/
@@ -36,18 +47,29 @@ venv.bak/
 *.swo
 *~
 .DS_Store
+._*
 
 # System
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# Database files
+*.db
+*.sqlite3
+*.sqlite
+*.db-journal
+*.sqlite3-journal
+
 # Docker
 *.dockerignore
 docker-compose.override.yml
 
+# Documentation
+CLAUDE.md
+
 # Logs
-*.log
+logs/*.log
 logs/
 
 # Temporary files

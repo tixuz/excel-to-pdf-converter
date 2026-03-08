@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Request, Form
+from fastapi import FastAPI, UploadFile, File, Request, Form, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +7,7 @@ import subprocess
 import os
 import uuid
 import logging
+import asyncio
 
 # === Logging Setup ===
 LOG_PATH = "/app/pdfprinter.log"
@@ -18,6 +19,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# === File Size Configuration ===
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
 # === Folder Setup ===
 TMP_DIR = "/app/tmp"
 FONT_DIR = "/usr/share/fonts/truetype/custom"
@@ -25,6 +29,25 @@ os.makedirs(TMP_DIR, exist_ok=True)
 os.makedirs(FONT_DIR, exist_ok=True)
 os.chmod(TMP_DIR, 0o777)
 os.chmod(FONT_DIR, 0o777)
+
+# === Background Task Functions ===
+async def delete_file_later(file_path: str, delay_minutes: int = 15):
+    """
+    Delete a file after a specified delay in minutes.
+    Runs as a background task to clean up temporary files.
+    """
+    try:
+        delay_seconds = delay_minutes * 60
+        logger.info(f"Scheduled deletion of {file_path} in {delay_minutes} minutes")
+        await asyncio.sleep(delay_seconds)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Deleted temporary file: {file_path}")
+        else:
+            logger.debug(f"File already deleted: {file_path}")
+    except Exception as e:
+        logger.error(f"Error deleting file {file_path}: {e}")
 
 # === App Setup ===
 app = FastAPI()
@@ -90,17 +113,34 @@ async def get_file(filename: str):
 
 # === Convert XLSX to PDF ===
 @app.post("/convert")
-async def convert_xlsx(file: UploadFile = File(...)):
+async def convert_xlsx(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
+    # Validate file size before processing
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size > MAX_FILE_SIZE:
+        logger.warning(f"File too large: {file.filename} ({file_size} bytes > {MAX_FILE_SIZE} bytes)")
+        return {"error": f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB."}
+
     input_path = os.path.join(TMP_DIR, f"{uuid.uuid4()}.xlsx")
     output_path = input_path.replace(".xlsx", ".pdf")
 
-    logger.info(f"Received file: {file.filename} → saving to {input_path}")
+    logger.info(f"Received file: {file.filename} ({file_size} bytes) → saving to {input_path}")
 
     try:
+        # Write file to disk
         with open(input_path, "wb") as f:
-            f.write(await file.read())
+            f.write(file_content)
         logger.info(f"Saved XLSX to: {input_path}")
 
+        # Schedule cleanup for input file (even if conversion fails)
+        background_tasks.add_task(delete_file_later, input_path, 15)
+        logger.debug(f"Scheduled cleanup for input file: {input_path}")
+
+        # Convert to PDF using LibreOffice
         result = subprocess.run([
             "libreoffice", "--headless", "--convert-to", "pdf", input_path, "--outdir", TMP_DIR
         ], capture_output=True, text=True)
@@ -113,6 +153,11 @@ async def convert_xlsx(file: UploadFile = File(...)):
                 logger.warning(f"LibreOffice warnings: {result.stderr}")
 
         logger.info(f"PDF created at: {output_path}")
+
+        # Schedule cleanup for output file
+        background_tasks.add_task(delete_file_later, output_path, 15)
+        logger.debug(f"Scheduled cleanup for output file: {output_path}")
+
         return FileResponse(
             path=output_path,
             media_type="application/pdf",
@@ -122,13 +167,6 @@ async def convert_xlsx(file: UploadFile = File(...)):
     except Exception as e:
         logger.exception("Error during PDF conversion")
         return {"error": str(e)}
-
-    # You may keep cleanup off or on:
-    # finally:
-    #     for path in [input_path, output_path]:
-    #         if os.path.exists(path):
-    #             os.remove(path)
-    #             logger.debug(f"Deleted temp file: {path}")
 
 # === PDF Management Page ===
 @app.get("/pdfs")

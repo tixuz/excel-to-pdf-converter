@@ -165,3 +165,31 @@ excel-to-pdf-converter/
 
 ## 📄 License
 MIT License - see LICENSE file for details
+
+# 📊 Excel to PDF Industrial Converter
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+[![LibreOffice](https://img.shields.io/badge/LibreOffice-Headless-orbit.svg)](https://www.libreoffice.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+
+Микросервис для высокоточного преобразования Excel-отчетов в PDF. Идеально подходит для систем отчетности (ERP/EMIS), где важно сохранение сложной разметки и шрифтов.
+
+## 🚀 Почему это решение?
+
+В отличие от простых библиотек, этот конвертер использует **LibreOffice в headless-режиме**, что гарантирует:
+- ✅ 100% сохранение формул, графиков и сводных таблиц.
+- ✅ Поддержку кастомных шрифтов (TTF/OTF) на уровне системы.
+- ✅ Готовый Docker-образ со всеми зависимостями (не нужно ставить Office на сервер).
+
+## 🛠 Технологии
+- **Backend**: FastAPI (Python 3.11+)
+- **Engine**: LibreOffice Headless
+- **Font Management**: Fontconfig (fc-cache)
+- **Containerization**: Docker
+
+## 📦 Быстрый старт
+
+### Через Docker (Рекомендуется)
+```bash
+docker build -t excel-pdf-service .
+docker run -p 5000:5000 excel-pdf-service
